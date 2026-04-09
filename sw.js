@@ -1,6 +1,6 @@
 // Service Worker — Agenda Ju
-const CACHE = 'agenda-ju-v1';
-const ASSETS = ['/', '/index.html', '/style.css', '/app.js', '/config.js', '/manifest.json'];
+const CACHE = 'agenda-ju-v3';
+const ASSETS = ['/', '/index.html', '/style.css', '/app.js', '/config.js', '/manifest.json', '/assets/icon.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).catch(()=>{}));
