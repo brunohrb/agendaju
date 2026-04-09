@@ -577,6 +577,7 @@ async function delEvent(id) {
   if (!confirm('Remover evento?')) return;
   await db.from('aju_events').delete().eq('id',id);
   toast('Evento removido');
+  closeModal();
   renderAgenda();
 }
 function openEditEvent(id) {
