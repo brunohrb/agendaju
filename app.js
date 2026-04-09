@@ -617,6 +617,7 @@ function openEditEvent(id) {
         </div>
       </div>
       <div class="form-actions">
+        <button type="button" class="btn-danger" onclick="delEvent('${id}')">🗑 Excluir</button>
         <button type="button" class="btn-outline" onclick="closeModal()">Cancelar</button>
         <button type="submit" class="btn-pink">Salvar</button>
       </div>
