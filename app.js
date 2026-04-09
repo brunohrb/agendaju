@@ -287,6 +287,35 @@ async function renderAgenda() {
   drawAgenda();
 }
 
+function upcomingGrouped(upcoming) {
+  const byDate = {};
+  for (const occ of upcoming) {
+    if (!byDate[occ._occurrence]) byDate[occ._occurrence] = [];
+    byDate[occ._occurrence].push(occ);
+  }
+  const REPEAT_LABEL = { daily:'Diário', weekly:'Semanal', monthly:'Mensal' };
+  return Object.entries(byDate).map(([dateStr, occs]) => {
+    const d = new Date(dateStr + 'T12:00:00');
+    const dayName = capFirst(new Intl.DateTimeFormat('pt-BR',{weekday:'long'}).format(d));
+    const dateLabel = new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'}).format(d);
+    const items = occs.map(occ => `
+      <div class="list-item">
+        <div style="width:10px;height:10px;border-radius:50%;background:${occ.color||'var(--pink)'};margin-top:5px;flex-shrink:0"></div>
+        <div class="item-body">
+          <div class="item-title">${occ.title}</div>
+          <div class="item-sub">
+            ${occ.start_time ? '🕐 '+occ.start_time : ''}
+            ${occ.location   ? '📍 '+occ.location   : ''}
+            ${occ.repeat     ? '🔁 '+REPEAT_LABEL[occ.repeat] : ''}
+          </div>
+        </div>
+        <button onclick="openEditEvent('${occ.id}')" class="edit-btn" title="Editar">✏️</button>
+        <button onclick="dismissEvent('${occ.id}','${occ._occurrence}')" style="background:linear-gradient(135deg,#ec4899,#8b5cf6);color:#fff;border:none;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0">✓ Feito</button>
+      </div>`).join('');
+    return `<div class="date-group-header"><span class="date-group-day">${dayName}</span><span class="date-group-date">${dateLabel}</span></div>${items}`;
+  }).join('');
+}
+
 function drawAgenda() {
   const { year, month, selected } = State.cal;
   const events = State.data.events;
@@ -321,19 +350,7 @@ function drawAgenda() {
       <div class="card-title">📆 Próximos eventos</div>
       ${upcoming.length === 0
         ? '<div class="empty"><p>Nenhum evento cadastrado</p></div>'
-        : upcoming.map(occ => `
-          <div class="list-item">
-            <div style="width:10px;height:10px;border-radius:50%;background:${occ.color||'var(--pink)'};margin-top:5px;flex-shrink:0"></div>
-            <div class="item-body">
-              <div class="item-title">${occ.title}</div>
-              <div class="item-sub">
-                ${fmtDate(occ._occurrence)}${occ.start_time?' às '+occ.start_time:''}
-                ${occ.location?'· 📍'+occ.location:''}
-                ${occ.repeat?'· 🔁'+{daily:'Diário',weekly:'Semanal',monthly:'Mensal'}[occ.repeat]:''}
-              </div>
-            </div>
-            <button onclick="dismissEvent('${occ.id}','${occ._occurrence}')" style="background:linear-gradient(135deg,#ec4899,#8b5cf6);color:#fff;border:none;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0">✓ Feito</button>
-          </div>`).join('')}
+        : upcomingGrouped(upcoming)}
     </div>`;
 }
 
@@ -560,6 +577,66 @@ async function delEvent(id) {
   if (!confirm('Remover evento?')) return;
   await db.from('aju_events').delete().eq('id',id);
   toast('Evento removido');
+  renderAgenda();
+}
+function openEditEvent(id) {
+  const ev = State.data.events.find(e => e.id === id);
+  if (!ev) return;
+  showModal(`
+    <h3>✏️ Editar evento</h3>
+    <form onsubmit="updateEvent(event,'${id}')">
+      <div class="form-row"><label>Título *</label><input name="title" required value="${(ev.title||'').replace(/"/g,'&quot;')}"></div>
+      <div class="form-row"><label>Descrição</label><textarea name="description" rows="2">${ev.description||''}</textarea></div>
+      <div class="form-cols">
+        <div class="form-row"><label>Data *</label><input name="start_date" type="date" value="${ev.start_date}" required></div>
+        <div class="form-row"><label>Local</label><input name="location" value="${(ev.location||'').replace(/"/g,'&quot;')}"></div>
+      </div>
+      <div class="form-cols">
+        <div class="form-row"><label>Início</label><input name="start_time" type="time" value="${ev.start_time||''}"></div>
+        <div class="form-row"><label>Fim</label><input name="end_time" type="time" value="${ev.end_time||''}"></div>
+      </div>
+      <div class="form-row">
+        <label>Repetir</label>
+        <div class="radio-group" id="repeat-opts">
+          <button type="button" class="radio-btn${!ev.repeat?' sel':''}" data-val="" onclick="selRadio(this,'repeat-opts')">🚫 Não</button>
+          <button type="button" class="radio-btn${ev.repeat==='daily'?' sel':''}" data-val="daily" onclick="selRadio(this,'repeat-opts')">☀️ Diário</button>
+          <button type="button" class="radio-btn${ev.repeat==='weekly'?' sel':''}" data-val="weekly" onclick="selRadio(this,'repeat-opts')">📅 Semanal</button>
+          <button type="button" class="radio-btn${ev.repeat==='monthly'?' sel':''}" data-val="monthly" onclick="selRadio(this,'repeat-opts')">📆 Mensal</button>
+        </div>
+      </div>
+      <div class="form-row" style="display:flex;flex-direction:column;gap:8px">
+        <label>Notificações</label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400">
+          <input type="checkbox" name="notify_event" ${ev.notify_event?'checked':''} style="width:auto;accent-color:var(--pink)"> 🔔 Notificar no dispositivo
+        </label>
+      </div>
+      <div class="form-row">
+        <label>Cor</label>
+        <div class="color-opts" id="ev-colors">
+          ${EVENT_COLORS.map(c=>`<div class="color-opt${c===ev.color?' sel':''}" style="background:${c}" onclick="selColor(this,'ev-colors')" data-color="${c}"></div>`).join('')}
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn-outline" onclick="closeModal()">Cancelar</button>
+        <button type="submit" class="btn-pink">Salvar</button>
+      </div>
+    </form>`);
+}
+async function updateEvent(e, id) {
+  e.preventDefault();
+  const f = e.target;
+  const color = document.querySelector('#ev-colors .sel')?.dataset.color || EVENT_COLORS[0];
+  const repeat = document.querySelector('#repeat-opts .sel')?.dataset.val || null;
+  const notify_event = f.notify_event.checked;
+  const { error } = await db.from('aju_events').update({
+    title: f.title.value, description: f.description.value,
+    start_date: f.start_date.value, start_time: f.start_time.value||null,
+    end_time: f.end_time.value||null, location: f.location.value,
+    color, repeat: repeat||null, notify_event
+  }).eq('id', id);
+  if (error) { toast('Erro ao atualizar evento','error'); return; }
+  toast('Evento atualizado! ✅');
+  closeModal();
   renderAgenda();
 }
 
