@@ -1,0 +1,16 @@
+{
+  "name": "Agenda Ju",
+  "short_name": "Agenda Ju",
+  "description": "Sua organização pessoal",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#fdf2f8",
+  "theme_color": "#ec4899",
+  "orientation": "portrait-primary",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "assets/icon.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "assets/icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "categories": ["productivity", "lifestyle"]
+}

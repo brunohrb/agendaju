@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Agenda Ju — Setup</title>
+  <style>
+    body { font-family: Inter, sans-serif; background: #fdf2f8; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+    .box { background: #fff; border-radius: 20px; padding: 36px; max-width: 400px; width: 90%; box-shadow: 0 8px 32px rgba(236,72,153,.15); text-align: center; }
+    h2 { color: #be185d; margin-bottom: 8px; }
+    p  { color: #6b7280; font-size: 13px; margin-bottom: 24px; }
+    button { background: linear-gradient(135deg,#ec4899,#8b5cf6); color: #fff; border: none; border-radius: 12px; padding: 12px 28px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%; }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    .msg { margin-top: 16px; font-size: 13px; font-weight: 600; }
+    .ok  { color: #16a34a; }
+    .err { color: #dc2626; }
+    pre  { background: #f3f4f6; border-radius: 8px; padding: 10px; font-size: 11px; text-align: left; margin-top: 12px; word-break: break-all; }
+  </style>
+</head>
+<body>
+<div class="box">
+  <h2>🌸 Agenda Ju — Setup</h2>
+  <p>Clique abaixo para criar a usuária padrão no Supabase.<br>
+     <strong>Usuário:</strong> ellen &nbsp;|&nbsp; <strong>Senha:</strong> 0495</p>
+  <button id="btn" onclick="criarUsuaria()">Criar usuária ellen / 0495</button>
+  <div class="msg" id="msg"></div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  db: { schema: 'agendaju' }
+});
+
+async function sha256(msg) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function criarUsuaria() {
+  const btn = document.getElementById('btn');
+  const msg = document.getElementById('msg');
+  btn.disabled = true;
+  btn.textContent = 'Criando…';
+  msg.innerHTML = '';
+
+  try {
+    const hash = await sha256('agendaju::0495');
+
+    // Verifica se já existe
+    const { data: existing } = await db.from('users').select('id').eq('username','ellen').maybeSingle();
+    if (existing) {
+      msg.innerHTML = '<span class="ok">✅ Usuária já existia! Faça login normalmente.</span>';
+      btn.textContent = 'Concluído';
+      return;
+    }
+
+    const { error } = await db.from('users').insert({ username: 'ellen', password_hash: hash });
+    if (error) throw error;
+
+    msg.innerHTML = `
+      <span class="ok">✅ Usuária criada com sucesso!</span><br>
+      <span style="font-size:12px;color:#6b7280">Abra o <strong>index.html</strong> e faça login.</span>
+      <pre>Usuário: ellen\nSenha:   0495</pre>`;
+    btn.textContent = '✅ Concluído';
+  } catch(e) {
+    msg.innerHTML = `<span class="err">❌ Erro: ${e.message}</span><pre>${JSON.stringify(e,null,2)}</pre>`;
+    btn.disabled = false;
+    btn.textContent = 'Tentar novamente';
+  }
+}
+</script>
+</body>
+</html>
