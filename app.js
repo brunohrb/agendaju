@@ -583,19 +583,21 @@ function openEditEvent(id) {
   const ev = State.data.events.find(e => e.id === id);
   if (!ev) return;
   showModal(`
-    <h3>✏️ Editar evento</h3>
+    <div class="modal-edit-header">
+      <h3>✏️ Editar evento</h3>
+      <button type="button" class="btn-del-header" onclick="delEvent('${id}')" title="Excluir evento">🗑</button>
+    </div>
     <form onsubmit="updateEvent(event,'${id}')">
-      <div class="form-row"><label>Título *</label><input name="title" required value="${(ev.title||'').replace(/"/g,'&quot;')}"></div>
-      <div class="form-row"><label>Descrição</label><textarea name="description" rows="2">${ev.description||''}</textarea></div>
+      <div class="form-row form-row-sm"><label>Título *</label><input name="title" required value="${(ev.title||'').replace(/"/g,'&quot;')}"></div>
       <div class="form-cols">
-        <div class="form-row"><label>Data *</label><input name="start_date" type="date" value="${ev.start_date}" required></div>
-        <div class="form-row"><label>Local</label><input name="location" value="${(ev.location||'').replace(/"/g,'&quot;')}"></div>
+        <div class="form-row form-row-sm"><label>Data *</label><input name="start_date" type="date" value="${ev.start_date}" required></div>
+        <div class="form-row form-row-sm"><label>Local</label><input name="location" placeholder="Endereço" value="${(ev.location||'').replace(/"/g,'&quot;')}"></div>
       </div>
       <div class="form-cols">
-        <div class="form-row"><label>Início</label><input name="start_time" type="time" value="${ev.start_time||''}"></div>
-        <div class="form-row"><label>Fim</label><input name="end_time" type="time" value="${ev.end_time||''}"></div>
+        <div class="form-row form-row-sm"><label>Início</label><input name="start_time" type="time" value="${ev.start_time||''}"></div>
+        <div class="form-row form-row-sm"><label>Fim</label><input name="end_time" type="time" value="${ev.end_time||''}"></div>
       </div>
-      <div class="form-row">
+      <div class="form-row form-row-sm">
         <label>Repetir</label>
         <div class="radio-group" id="repeat-opts">
           <button type="button" class="radio-btn${!ev.repeat?' sel':''}" data-val="" onclick="selRadio(this,'repeat-opts')">🚫 Não</button>
@@ -604,20 +606,13 @@ function openEditEvent(id) {
           <button type="button" class="radio-btn${ev.repeat==='monthly'?' sel':''}" data-val="monthly" onclick="selRadio(this,'repeat-opts')">📆 Mensal</button>
         </div>
       </div>
-      <div class="form-row" style="display:flex;flex-direction:column;gap:8px">
-        <label>Notificações</label>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400">
-          <input type="checkbox" name="notify_event" ${ev.notify_event?'checked':''} style="width:auto;accent-color:var(--pink)"> 🔔 Notificar no dispositivo
-        </label>
-      </div>
-      <div class="form-row">
+      <div class="form-row form-row-sm">
         <label>Cor</label>
         <div class="color-opts" id="ev-colors">
           ${EVENT_COLORS.map(c=>`<div class="color-opt${c===ev.color?' sel':''}" style="background:${c}" onclick="selColor(this,'ev-colors')" data-color="${c}"></div>`).join('')}
         </div>
       </div>
-      <div class="form-actions">
-        <button type="button" class="btn-danger" onclick="delEvent('${id}')">🗑 Excluir</button>
+      <div class="form-actions" style="margin-top:14px">
         <button type="button" class="btn-outline" onclick="closeModal()">Cancelar</button>
         <button type="submit" class="btn-pink">Salvar</button>
       </div>
