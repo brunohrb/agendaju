@@ -5,9 +5,8 @@
 'use strict';
 
 // ── SUPABASE INIT ──────────────────────────────
-const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-  db: { schema: 'agendaju' }
-});
+// Tabelas no schema public com prefixo aju_ para não conflitar
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── CONSTANTS ──────────────────────────────────
 const NOTE_COLORS  = ['#fce7f3','#ede9fe','#dbeafe','#dcfce7','#fef9c3','#ffedd5','#f3f4f6'];
@@ -91,7 +90,7 @@ async function hashPass(p) { return sha256('agendaju::' + p); }
 
 async function loginUser(username, password) {
   const hash = await hashPass(password);
-  const { data, error } = await db.from('users').select('*')
+  const { data, error } = await db.from('aju_users').select('*')
     .eq('username', username.toLowerCase().trim())
     .eq('password_hash', hash)
     .single();
@@ -205,9 +204,9 @@ async function renderDashboard() {
   const name = capFirst(State.user.username);
 
   const [rRes, tkRes, nRes] = await Promise.all([
-    db.from('reminders').select('*').eq('user_id',uid).eq('completed',false).order('due_date'),
-    db.from('tasks').select('id').eq('user_id',uid).eq('completed',false),
-    db.from('notes').select('*').eq('user_id',uid).order('updated_at',{ascending:false}).limit(4)
+    db.from('aju_reminders').select('*').eq('user_id',uid).eq('completed',false).order('due_date'),
+    db.from('aju_tasks').select('id').eq('user_id',uid).eq('completed',false),
+    db.from('aju_notes').select('*').eq('user_id',uid).order('updated_at',{ascending:false}).limit(4)
   ]);
 
   const reminders  = rRes.data || [];
@@ -283,7 +282,7 @@ async function renderDashboard() {
 // ══════════════════════════════════════════════
 async function renderAgenda() {
   const uid = State.user.userId;
-  const { data: events } = await db.from('events').select('*').eq('user_id',uid).order('start_date');
+  const { data: events } = await db.from('aju_events').select('*').eq('user_id',uid).order('start_date');
   State.data.events = events || [];
   drawAgenda();
 }
@@ -403,7 +402,7 @@ async function saveEvent(e) {
   e.preventDefault();
   const f = e.target;
   const color = document.querySelector('#ev-colors .sel')?.dataset.color || EVENT_COLORS[0];
-  const { error } = await db.from('events').insert({
+  const { error } = await db.from('aju_events').insert({
     user_id: State.user.userId,
     title: f.title.value, description: f.description.value,
     start_date: f.start_date.value, start_time: f.start_time.value||null,
@@ -416,7 +415,7 @@ async function saveEvent(e) {
 }
 async function delEvent(id) {
   if (!confirm('Remover evento?')) return;
-  await db.from('events').delete().eq('id',id);
+  await db.from('aju_events').delete().eq('id',id);
   toast('Evento removido');
   renderAgenda();
 }
@@ -427,7 +426,7 @@ async function delEvent(id) {
 async function renderLembretes() {
   const uid = State.user.userId;
   const filter = State._rFilter || 'pending';
-  const { data } = await db.from('reminders').select('*').eq('user_id',uid).order('due_date').order('due_time');
+  const { data } = await db.from('aju_reminders').select('*').eq('user_id',uid).order('due_date').order('due_time');
   State.data.reminders = data || [];
   drawLembretes(filter);
 }
@@ -497,7 +496,7 @@ async function saveReminder(e) {
   e.preventDefault();
   const f = e.target;
   const priority = document.querySelector('#prio-opts .sel')?.dataset.val || 'medium';
-  const { data, error } = await db.from('reminders').insert({
+  const { data, error } = await db.from('aju_reminders').insert({
     user_id: State.user.userId,
     title: f.title.value, description: f.description.value,
     due_date: f.due_date.value, due_time: f.due_time.value||null,
@@ -510,11 +509,11 @@ async function saveReminder(e) {
   renderLembretes();
 }
 async function toggleReminder(id, done) {
-  await db.from('reminders').update({ completed: !done }).eq('id',id);
+  await db.from('aju_reminders').update({ completed: !done }).eq('id',id);
   renderLembretes();
 }
 async function delReminder(id) {
-  await db.from('reminders').delete().eq('id',id);
+  await db.from('aju_reminders').delete().eq('id',id);
   toast('Removido'); renderLembretes();
 }
 
@@ -522,7 +521,7 @@ async function delReminder(id) {
 // NOTAS
 // ══════════════════════════════════════════════
 async function renderNotas() {
-  const { data } = await db.from('notes').select('*').eq('user_id',State.user.userId)
+  const { data } = await db.from('aju_notes').select('*').eq('user_id',State.user.userId)
     .order('pinned',{ascending:false}).order('updated_at',{ascending:false});
   State.data.notes = data || [];
   drawNotas();
@@ -595,23 +594,23 @@ async function saveNote(e) {
   e.preventDefault();
   const f = e.target;
   const color = document.querySelector('#note-colors .sel')?.dataset.color || NOTE_COLORS[0];
-  await db.from('notes').insert({ user_id:State.user.userId, title:f.title.value, content:f.content.value, color, pinned:false });
+  await db.from('aju_notes').insert({ user_id:State.user.userId, title:f.title.value, content:f.content.value, color, pinned:false });
   toast('Nota criada! 📝'); closeModal(); renderNotas();
 }
 async function updateNote(e, id) {
   e.preventDefault();
   const f = e.target;
   const color = document.querySelector('#note-colors .sel')?.dataset.color || NOTE_COLORS[0];
-  await db.from('notes').update({ title:f.title.value, content:f.content.value, color, updated_at:new Date().toISOString() }).eq('id',id);
+  await db.from('aju_notes').update({ title:f.title.value, content:f.content.value, color, updated_at:new Date().toISOString() }).eq('id',id);
   toast('Nota atualizada!'); closeModal(); renderNotas();
 }
 async function delNote(id) {
   if(!confirm('Excluir nota?')) return;
-  await db.from('notes').delete().eq('id',id);
+  await db.from('aju_notes').delete().eq('id',id);
   toast('Nota removida'); closeModal(); renderNotas();
 }
 async function togglePin(id, pinned) {
-  await db.from('notes').update({ pinned:!pinned }).eq('id',id);
+  await db.from('aju_notes').update({ pinned:!pinned }).eq('id',id);
   renderNotas();
 }
 
@@ -620,7 +619,7 @@ async function togglePin(id, pinned) {
 // ══════════════════════════════════════════════
 const TASK_CATS = ['Pessoal','Trabalho','Saúde','Casa','Estudos','Compras','Outros'];
 async function renderTarefas() {
-  const { data } = await db.from('tasks').select('*').eq('user_id',State.user.userId).order('created_at',{ascending:false});
+  const { data } = await db.from('aju_tasks').select('*').eq('user_id',State.user.userId).order('created_at',{ascending:false});
   State.data.tasks = data || [];
   drawTarefas(State._tkFilter||'pending', State._tkCat||'all');
 }
@@ -693,15 +692,15 @@ async function saveTask(e) {
   e.preventDefault();
   const f = e.target;
   const priority = document.querySelector('#task-prio .sel')?.dataset.val || 'medium';
-  await db.from('tasks').insert({ user_id:State.user.userId, title:f.title.value, description:f.description.value, due_date:f.due_date.value||null, category:f.category.value, priority, completed:false });
+  await db.from('aju_tasks').insert({ user_id:State.user.userId, title:f.title.value, description:f.description.value, due_date:f.due_date.value||null, category:f.category.value, priority, completed:false });
   toast('Tarefa criada! ✅'); closeModal(); renderTarefas();
 }
 async function toggleTask(id, done) {
-  await db.from('tasks').update({ completed:!done }).eq('id',id);
+  await db.from('aju_tasks').update({ completed:!done }).eq('id',id);
   renderTarefas();
 }
 async function delTask(id) {
-  await db.from('tasks').delete().eq('id',id);
+  await db.from('aju_tasks').delete().eq('id',id);
   toast('Removida'); renderTarefas();
 }
 
@@ -713,8 +712,8 @@ async function renderHabitos() {
   const uid = State.user.userId;
   const t = today();
   const [hRes, lRes] = await Promise.all([
-    db.from('habits').select('*').eq('user_id',uid).order('created_at'),
-    db.from('habit_logs').select('habit_id').gte('completed_at',t+'T00:00:00').lte('completed_at',t+'T23:59:59')
+    db.from('aju_habits').select('*').eq('user_id',uid).order('created_at'),
+    db.from('aju_habit_logs').select('habit_id').gte('completed_at',t+'T00:00:00').lte('completed_at',t+'T23:59:59')
   ]);
   State.data.habits    = hRes.data || [];
   State.data.habitLogs = new Set((lRes.data||[]).map(l=>l.habit_id));
@@ -793,20 +792,20 @@ async function saveHabito(e) {
   const icon  = document.querySelector('#hicon-opts .sel')?.dataset.icon  || '💧';
   const freq  = document.querySelector('#freq-opts .sel')?.dataset.val    || 'daily';
   const color = document.querySelector('#habit-colors .sel')?.dataset.color || NOTE_COLORS[0];
-  await db.from('habits').insert({ user_id:State.user.userId, name:f.name.value, icon, frequency:freq, color, streak:0 });
+  await db.from('aju_habits').insert({ user_id:State.user.userId, name:f.name.value, icon, frequency:freq, color, streak:0 });
   toast('Hábito criado! 🌱'); closeModal(); renderHabitos();
 }
 async function toggleHabito(id, isDone) {
   const t = today();
   if (isDone) {
-    await db.from('habit_logs').delete().eq('habit_id',id).gte('completed_at',t+'T00:00:00');
+    await db.from('aju_habit_logs').delete().eq('habit_id',id).gte('completed_at',t+'T00:00:00');
     const h = State.data.habits.find(x=>x.id===id);
-    await db.from('habits').update({ streak:Math.max(0,(h?.streak||1)-1) }).eq('id',id);
+    await db.from('aju_habits').update({ streak:Math.max(0,(h?.streak||1)-1) }).eq('id',id);
   } else {
-    await db.from('habit_logs').insert({ habit_id:id, completed_at:new Date().toISOString() });
+    await db.from('aju_habit_logs').insert({ habit_id:id, completed_at:new Date().toISOString() });
     const h = State.data.habits.find(x=>x.id===id);
     const ns = (h?.streak||0)+1;
-    await db.from('habits').update({ streak:ns, last_completed:t }).eq('id',id);
+    await db.from('aju_habits').update({ streak:ns, last_completed:t }).eq('id',id);
     if (ns>=7) toast(`🔥 ${ns} dias seguidos! Incrível, Ju!`,'info');
     else toast(`${h?.icon||'🌱'} ${h?.name} concluído!`);
   }
@@ -814,7 +813,7 @@ async function toggleHabito(id, isDone) {
 }
 async function delHabito(id) {
   if(!confirm('Remover hábito?')) return;
-  await db.from('habits').delete().eq('id',id);
+  await db.from('aju_habits').delete().eq('id',id);
   toast('Hábito removido'); renderHabitos();
 }
 
@@ -828,7 +827,7 @@ async function renderFinancas() {
   const now  = new Date();
   const mStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
   const mEnd   = new Date(now.getFullYear(),now.getMonth()+1,0).toISOString().slice(0,10);
-  const { data } = await db.from('finances').select('*').eq('user_id',uid)
+  const { data } = await db.from('aju_finances').select('*').eq('user_id',uid)
     .gte('date',mStart).lte('date',mEnd).order('date',{ascending:false});
   State.data.finances = data || [];
   drawFinancas(State.finFilter);
@@ -906,12 +905,12 @@ async function saveFinanca(e) {
   e.preventDefault();
   const f    = e.target;
   const type = document.querySelector('#tipo-opts .sel')?.dataset.val || 'expense';
-  await db.from('finances').insert({ user_id:State.user.userId, title:f.title.value, amount:parseFloat(f.amount.value), type, category:f.category.value, date:f.date.value });
+  await db.from('aju_finances').insert({ user_id:State.user.userId, title:f.title.value, amount:parseFloat(f.amount.value), type, category:f.category.value, date:f.date.value });
   toast(type==='income'?'Receita adicionada! 💚':'Despesa registrada! 📊');
   closeModal(); renderFinancas();
 }
 async function delFinanca(id) {
-  await db.from('finances').delete().eq('id',id);
+  await db.from('aju_finances').delete().eq('id',id);
   toast('Removido'); renderFinancas();
 }
 
@@ -987,10 +986,10 @@ async function doChangePass(e) {
   if (f.nw.value !== f.nw2.value) { err.textContent='Senhas não coincidem'; err.style.display='block'; return; }
   if (f.nw.value.length < 4)      { err.textContent='Mínimo 4 caracteres';  err.style.display='block'; return; }
   const curHash = await hashPass(f.cur.value);
-  const { data:user } = await db.from('users').select('password_hash').eq('id',State.user.userId).single();
+  const { data:user } = await db.from('aju_users').select('password_hash').eq('id',State.user.userId).single();
   if (user?.password_hash !== curHash) { err.textContent='Senha atual incorreta'; err.style.display='block'; return; }
   const newHash = await hashPass(f.nw.value);
-  await db.from('users').update({ password_hash:newHash }).eq('id',State.user.userId);
+  await db.from('aju_users').update({ password_hash:newHash }).eq('id',State.user.userId);
   toast('Senha alterada com sucesso! 🔐');
   closeModal();
 }
@@ -1016,7 +1015,7 @@ function scheduleNotif(reminder) {
 }
 async function rescheduleNotifs() {
   if (Notification.permission !== 'granted') return;
-  const { data } = await db.from('reminders').select('*')
+  const { data } = await db.from('aju_reminders').select('*')
     .eq('user_id',State.user.userId).eq('completed',false).eq('notify_browser',true);
   (data||[]).forEach(scheduleNotif);
 }

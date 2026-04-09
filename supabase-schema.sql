@@ -1,23 +1,24 @@
 -- ================================================================
 --  AGENDA JU — SQL para o Supabase SQL Editor
---  Schema: agendaju  (já criado e exposto na Data API ✅)
---  ⚠️  Não altera nada dos schemas public / treino / graphql_public
+--  Schema: PUBLIC  (sempre exposto, sem configuração extra)
+--  Tabelas com prefixo aju_ para não conflitar com nada existente
+--  ⚠️  Não altera nenhuma tabela existente do seu projeto
 -- ================================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- ── 1. USERS ─────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS agendaju.users (
+-- ── 1. aju_users ─────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.aju_users (
   id            UUID         DEFAULT uuid_generate_v4() PRIMARY KEY,
   username      VARCHAR(50)  UNIQUE NOT NULL,
   password_hash TEXT         NOT NULL,
   created_at    TIMESTAMPTZ  DEFAULT NOW()
 );
 
--- ── 2. NOTES ─────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS agendaju.notes (
+-- ── 2. aju_notes ─────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.aju_notes (
   id         UUID         DEFAULT uuid_generate_v4() PRIMARY KEY,
-  user_id    UUID         REFERENCES agendaju.users(id) ON DELETE CASCADE,
+  user_id    UUID         REFERENCES public.aju_users(id) ON DELETE CASCADE,
   title      VARCHAR(255) NOT NULL,
   content    TEXT         DEFAULT '',
   color      VARCHAR(20)  DEFAULT '#fce7f3',
@@ -26,10 +27,10 @@ CREATE TABLE IF NOT EXISTS agendaju.notes (
   updated_at TIMESTAMPTZ  DEFAULT NOW()
 );
 
--- ── 3. REMINDERS ─────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS agendaju.reminders (
+-- ── 3. aju_reminders ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.aju_reminders (
   id             UUID         DEFAULT uuid_generate_v4() PRIMARY KEY,
-  user_id        UUID         REFERENCES agendaju.users(id) ON DELETE CASCADE,
+  user_id        UUID         REFERENCES public.aju_users(id) ON DELETE CASCADE,
   title          VARCHAR(255) NOT NULL,
   description    TEXT,
   due_date       DATE         NOT NULL,
@@ -41,10 +42,10 @@ CREATE TABLE IF NOT EXISTS agendaju.reminders (
   created_at     TIMESTAMPTZ  DEFAULT NOW()
 );
 
--- ── 4. TASKS ─────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS agendaju.tasks (
+-- ── 4. aju_tasks ─────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.aju_tasks (
   id          UUID         DEFAULT uuid_generate_v4() PRIMARY KEY,
-  user_id     UUID         REFERENCES agendaju.users(id) ON DELETE CASCADE,
+  user_id     UUID         REFERENCES public.aju_users(id) ON DELETE CASCADE,
   title       VARCHAR(255) NOT NULL,
   description TEXT,
   due_date    DATE,
@@ -55,10 +56,10 @@ CREATE TABLE IF NOT EXISTS agendaju.tasks (
   created_at  TIMESTAMPTZ  DEFAULT NOW()
 );
 
--- ── 5. EVENTS (Agenda/Calendário) ────────────────────────────────
-CREATE TABLE IF NOT EXISTS agendaju.events (
+-- ── 5. aju_events ────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.aju_events (
   id          UUID         DEFAULT uuid_generate_v4() PRIMARY KEY,
-  user_id     UUID         REFERENCES agendaju.users(id) ON DELETE CASCADE,
+  user_id     UUID         REFERENCES public.aju_users(id) ON DELETE CASCADE,
   title       VARCHAR(255) NOT NULL,
   description TEXT,
   start_date  DATE         NOT NULL,
@@ -70,10 +71,10 @@ CREATE TABLE IF NOT EXISTS agendaju.events (
   created_at  TIMESTAMPTZ  DEFAULT NOW()
 );
 
--- ── 6. HABITS ────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS agendaju.habits (
+-- ── 6. aju_habits ────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.aju_habits (
   id             UUID         DEFAULT uuid_generate_v4() PRIMARY KEY,
-  user_id        UUID         REFERENCES agendaju.users(id) ON DELETE CASCADE,
+  user_id        UUID         REFERENCES public.aju_users(id) ON DELETE CASCADE,
   name           VARCHAR(100) NOT NULL,
   icon           VARCHAR(10)  DEFAULT '💧',
   frequency      VARCHAR(10)  DEFAULT 'daily'
@@ -84,17 +85,17 @@ CREATE TABLE IF NOT EXISTS agendaju.habits (
   created_at     TIMESTAMPTZ  DEFAULT NOW()
 );
 
--- ── 7. HABIT_LOGS ────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS agendaju.habit_logs (
+-- ── 7. aju_habit_logs ────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.aju_habit_logs (
   id           UUID        DEFAULT uuid_generate_v4() PRIMARY KEY,
-  habit_id     UUID        REFERENCES agendaju.habits(id) ON DELETE CASCADE,
+  habit_id     UUID        REFERENCES public.aju_habits(id) ON DELETE CASCADE,
   completed_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ── 8. FINANCES ──────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS agendaju.finances (
+-- ── 8. aju_finances ──────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.aju_finances (
   id         UUID          DEFAULT uuid_generate_v4() PRIMARY KEY,
-  user_id    UUID          REFERENCES agendaju.users(id) ON DELETE CASCADE,
+  user_id    UUID          REFERENCES public.aju_users(id) ON DELETE CASCADE,
   title      VARCHAR(255)  NOT NULL,
   amount     NUMERIC(10,2) NOT NULL,
   type       VARCHAR(10)   NOT NULL CHECK (type IN ('income','expense')),
@@ -105,24 +106,24 @@ CREATE TABLE IF NOT EXISTS agendaju.finances (
 );
 
 -- ================================================================
---  ROW LEVEL SECURITY
+--  ROW LEVEL SECURITY — apenas nas tabelas aju_
 -- ================================================================
-ALTER TABLE agendaju.users      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE agendaju.notes      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE agendaju.reminders  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE agendaju.tasks      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE agendaju.events     ENABLE ROW LEVEL SECURITY;
-ALTER TABLE agendaju.habits     ENABLE ROW LEVEL SECURITY;
-ALTER TABLE agendaju.habit_logs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE agendaju.finances   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.aju_users      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.aju_notes      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.aju_reminders  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.aju_tasks      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.aju_events     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.aju_habits     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.aju_habit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.aju_finances   ENABLE ROW LEVEL SECURITY;
 
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='agendaju' AND tablename='users'      AND policyname='aju_users')      THEN CREATE POLICY aju_users      ON agendaju.users      FOR ALL USING (true) WITH CHECK (true); END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='agendaju' AND tablename='notes'      AND policyname='aju_notes')      THEN CREATE POLICY aju_notes      ON agendaju.notes      FOR ALL USING (true) WITH CHECK (true); END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='agendaju' AND tablename='reminders'  AND policyname='aju_reminders')  THEN CREATE POLICY aju_reminders  ON agendaju.reminders  FOR ALL USING (true) WITH CHECK (true); END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='agendaju' AND tablename='tasks'      AND policyname='aju_tasks')      THEN CREATE POLICY aju_tasks      ON agendaju.tasks      FOR ALL USING (true) WITH CHECK (true); END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='agendaju' AND tablename='events'     AND policyname='aju_events')     THEN CREATE POLICY aju_events     ON agendaju.events     FOR ALL USING (true) WITH CHECK (true); END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='agendaju' AND tablename='habits'     AND policyname='aju_habits')     THEN CREATE POLICY aju_habits     ON agendaju.habits     FOR ALL USING (true) WITH CHECK (true); END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='agendaju' AND tablename='habit_logs' AND policyname='aju_habit_logs') THEN CREATE POLICY aju_habit_logs ON agendaju.habit_logs FOR ALL USING (true) WITH CHECK (true); END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='agendaju' AND tablename='finances'   AND policyname='aju_finances')   THEN CREATE POLICY aju_finances   ON agendaju.finances   FOR ALL USING (true) WITH CHECK (true); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='aju_users'      AND policyname='aju_users_pol')      THEN CREATE POLICY aju_users_pol      ON public.aju_users      FOR ALL USING (true) WITH CHECK (true); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='aju_notes'      AND policyname='aju_notes_pol')      THEN CREATE POLICY aju_notes_pol      ON public.aju_notes      FOR ALL USING (true) WITH CHECK (true); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='aju_reminders'  AND policyname='aju_reminders_pol')  THEN CREATE POLICY aju_reminders_pol  ON public.aju_reminders  FOR ALL USING (true) WITH CHECK (true); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='aju_tasks'      AND policyname='aju_tasks_pol')      THEN CREATE POLICY aju_tasks_pol      ON public.aju_tasks      FOR ALL USING (true) WITH CHECK (true); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='aju_events'     AND policyname='aju_events_pol')     THEN CREATE POLICY aju_events_pol     ON public.aju_events     FOR ALL USING (true) WITH CHECK (true); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='aju_habits'     AND policyname='aju_habits_pol')     THEN CREATE POLICY aju_habits_pol     ON public.aju_habits     FOR ALL USING (true) WITH CHECK (true); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='aju_habit_logs' AND policyname='aju_habit_logs_pol') THEN CREATE POLICY aju_habit_logs_pol ON public.aju_habit_logs FOR ALL USING (true) WITH CHECK (true); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='aju_finances'   AND policyname='aju_finances_pol')   THEN CREATE POLICY aju_finances_pol   ON public.aju_finances   FOR ALL USING (true) WITH CHECK (true); END IF;
 END $$;

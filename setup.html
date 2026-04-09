@@ -28,9 +28,8 @@
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
-const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-  db: { schema: 'agendaju' }
-});
+// Schema public, tabelas com prefixo aju_
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 async function sha256(msg) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
@@ -48,14 +47,14 @@ async function criarUsuaria() {
     const hash = await sha256('agendaju::0495');
 
     // Verifica se já existe
-    const { data: existing } = await db.from('users').select('id').eq('username','ellen').maybeSingle();
+    const { data: existing } = await db.from('aju_users').select('id').eq('username','ellen').maybeSingle();
     if (existing) {
       msg.innerHTML = '<span class="ok">✅ Usuária já existia! Faça login normalmente.</span>';
       btn.textContent = 'Concluído';
       return;
     }
 
-    const { error } = await db.from('users').insert({ username: 'ellen', password_hash: hash });
+    const { error } = await db.from('aju_users').insert({ username: 'ellen', password_hash: hash });
     if (error) throw error;
 
     msg.innerHTML = `
