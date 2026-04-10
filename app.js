@@ -19,7 +19,7 @@ const PTBR = {
 const PAGE_TITLES = {
   dashboard: 'Início', agenda: 'Agenda', lembretes: 'Lembretes',
   notas: 'Notas', mercado: 'Lista de Mercado', habitos: 'Hábitos',
-  financas: 'Finanças', cofre: 'Cofre', config: 'Configurações'
+  financas: 'Finanças', cofre: 'Cofre', rastreamento: 'Rastreamento', config: 'Configurações'
 };
 
 // ── STATE ──────────────────────────────────────
@@ -29,7 +29,11 @@ const State = {
   cal: { year: new Date().getFullYear(), month: new Date().getMonth(), selected: new Date() },
   data: { reminders:[], notes:[], events:[], habits:[], habitLogs:[], finances:[], shopping:[], vault:[] },
   notifTimers: [],
-  finFilter: 'expense'
+  finFilter: 'expense',
+  trackMap: null,
+  trackMarkers: {},
+  trackSub: null,
+  trackInterval: null
 };
 
 // ── UTILS ──────────────────────────────────────
@@ -181,7 +185,7 @@ const App = {
     const renders = {
       dashboard: renderDashboard, agenda: renderAgenda, lembretes: renderLembretes,
       notas: renderNotas, mercado: renderMercado, habitos: renderHabitos,
-      financas: renderFinancas, cofre: renderCofre, config: renderConfig
+      financas: renderFinancas, cofre: renderCofre, rastreamento: renderRastreamento, config: renderConfig
     };
     renders[page]?.();
   },
@@ -1442,6 +1446,349 @@ function selIcon(el) {
     e.classList.remove('sel'); e.style.borderColor='var(--gray-200)';
   });
   el.classList.add('sel'); el.style.borderColor='var(--pink)';
+}
+
+// ══════════════════════════════════════════════
+// RASTREAMENTO DE MOTOS
+// ══════════════════════════════════════════════
+const MOTO_COLORS = ['#ec4899','#8b5cf6','#3b82f6','#10b981','#f59e0b','#ef4444','#06b6d4','#84cc16'];
+const MOTO_ICONS  = ['🏍️','🛵','🏎️','🚲','🛺','🚗'];
+
+async function renderRastreamento() {
+  const uid = State.user.userId;
+  const { data: motos } = await db.from('aju_motorcycles').select('*').eq('user_id', uid).order('created_at');
+  const motorcycles = motos || [];
+
+  $('c-rastreamento').innerHTML = `
+    <div class="track-layout">
+      <div class="track-sidebar">
+        <div class="track-sidebar-header">
+          <h3>🏍️ Motos</h3>
+          <button class="btn-pink btn-sm" onclick="openNewMoto()">+ Adicionar</button>
+        </div>
+        <div class="track-moto-list" id="track-moto-list">
+          ${motorcycles.length === 0
+            ? '<div class="empty" style="padding:24px 12px"><div class="empty-icon">🏍️</div><p>Nenhuma moto cadastrada</p></div>'
+            : motorcycles.map(m => `
+              <div class="track-moto-card" id="mcard-${m.id}" onclick="focusMoto('${m.id}')">
+                <div class="track-moto-icon" style="background:${m.color}20;color:${m.color}">${m.icon || '🏍️'}</div>
+                <div class="track-moto-info">
+                  <div class="track-moto-name">${m.name}</div>
+                  <div class="track-moto-plate">${m.plate || 'Sem placa'}</div>
+                  <div class="track-moto-status" id="mstatus-${m.id}">
+                    <span class="status-dot offline"></span> Aguardando sinal...
+                  </div>
+                </div>
+                <div class="track-moto-actions">
+                  <button class="icon-btn-sm" onclick="event.stopPropagation();openEditMoto('${m.id}')" title="Editar">✏️</button>
+                </div>
+              </div>`).join('')}
+        </div>
+      </div>
+      <div class="track-map-wrap">
+        <div id="track-map" class="track-map"></div>
+        <div class="track-map-legend">
+          <span><span class="status-dot online"></span> Ligada</span>
+          <span><span class="status-dot moving"></span> Em movimento</span>
+          <span><span class="status-dot offline"></span> Desligada</span>
+        </div>
+      </div>
+    </div>`;
+
+  initTrackMap();
+  if (motorcycles.length > 0) loadMotoPositions(motorcycles);
+  startTrackingUpdates();
+}
+
+function initTrackMap() {
+  if (State.trackMap) { State.trackMap.remove(); State.trackMap = null; }
+  State.trackMarkers = {};
+
+  const map = L.map('track-map', {
+    zoomControl: true,
+    attributionControl: false
+  }).setView([-14.235, -51.925], 4);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+
+  L.control.attribution({ position: 'bottomright', prefix: false }).addTo(map);
+
+  State.trackMap = map;
+
+  setTimeout(() => map.invalidateSize(), 200);
+}
+
+async function loadMotoPositions(motorcycles) {
+  const bounds = [];
+
+  for (const moto of motorcycles) {
+    const { data: pos } = await db.from('aju_moto_positions')
+      .select('*')
+      .eq('motorcycle_id', moto.id)
+      .order('recorded_at', { ascending: false })
+      .limit(1);
+
+    if (pos && pos.length > 0) {
+      const p = pos[0];
+      const lat = parseFloat(p.latitude);
+      const lng = parseFloat(p.longitude);
+      updateMotoMarker(moto, p);
+      bounds.push([lat, lng]);
+      updateMotoStatusCard(moto.id, p);
+    }
+  }
+
+  if (bounds.length > 0) {
+    State.trackMap.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
+  }
+}
+
+function createMotoIcon(moto, pos) {
+  const isMoving = pos && parseFloat(pos.speed) > 2;
+  const isOn = pos && pos.ignition;
+  const statusClass = isMoving ? 'moving' : (isOn ? 'online' : 'offline');
+  const rotation = pos ? parseFloat(pos.heading || 0) : 0;
+
+  return L.divIcon({
+    className: 'moto-marker-wrap',
+    html: `<div class="moto-marker ${statusClass}" style="background:${moto.color}">
+             <span class="moto-marker-icon" style="transform:rotate(${rotation}deg)">${moto.icon || '🏍️'}</span>
+           </div>
+           <div class="moto-marker-label">${moto.name}</div>`,
+    iconSize: [48, 56],
+    iconAnchor: [24, 56],
+    popupAnchor: [0, -56]
+  });
+}
+
+function updateMotoMarker(moto, pos) {
+  const lat = parseFloat(pos.latitude);
+  const lng = parseFloat(pos.longitude);
+  const speed = parseFloat(pos.speed || 0);
+  const isMoving = speed > 2;
+  const isOn = pos.ignition;
+  const timeAgo = getTimeAgo(pos.recorded_at);
+
+  const popupHtml = `
+    <div class="moto-popup">
+      <div class="moto-popup-header" style="border-color:${moto.color}">
+        <span>${moto.icon || '🏍️'}</span>
+        <strong>${moto.name}</strong>
+      </div>
+      <div class="moto-popup-body">
+        <div class="moto-popup-row">🏷️ Placa: <strong>${moto.plate || 'N/A'}</strong></div>
+        <div class="moto-popup-row">📡 Velocidade: <strong>${speed.toFixed(1)} km/h</strong></div>
+        <div class="moto-popup-row">${isOn ? '🟢 Ignição: Ligada' : '🔴 Ignição: Desligada'}</div>
+        ${pos.battery != null ? `<div class="moto-popup-row">🔋 Bateria: <strong>${parseFloat(pos.battery).toFixed(0)}%</strong></div>` : ''}
+        <div class="moto-popup-row">🕐 Atualizado: <strong>${timeAgo}</strong></div>
+        <div class="moto-popup-row" style="font-size:10px;color:#888">📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
+      </div>
+    </div>`;
+
+  if (State.trackMarkers[moto.id]) {
+    State.trackMarkers[moto.id].setLatLng([lat, lng]);
+    State.trackMarkers[moto.id].setIcon(createMotoIcon(moto, pos));
+    State.trackMarkers[moto.id].setPopupContent(popupHtml);
+  } else {
+    const marker = L.marker([lat, lng], { icon: createMotoIcon(moto, pos) })
+      .addTo(State.trackMap)
+      .bindPopup(popupHtml, { maxWidth: 260, className: 'moto-popup-container' });
+    State.trackMarkers[moto.id] = marker;
+  }
+}
+
+function updateMotoStatusCard(motoId, pos) {
+  const el = document.getElementById(`mstatus-${motoId}`);
+  if (!el) return;
+  const speed = parseFloat(pos.speed || 0);
+  const isMoving = speed > 2;
+  const isOn = pos.ignition;
+  const statusClass = isMoving ? 'moving' : (isOn ? 'online' : 'offline');
+  const statusText = isMoving
+    ? `${speed.toFixed(0)} km/h`
+    : (isOn ? 'Ligada - Parada' : 'Desligada');
+  const timeAgo = getTimeAgo(pos.recorded_at);
+  el.innerHTML = `<span class="status-dot ${statusClass}"></span> ${statusText} <span class="track-time">${timeAgo}</span>`;
+}
+
+function getTimeAgo(dateStr) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'agora';
+  if (mins < 60) return `${mins}min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d`;
+}
+
+function focusMoto(motoId) {
+  const marker = State.trackMarkers[motoId];
+  if (marker) {
+    State.trackMap.setView(marker.getLatLng(), 16, { animate: true });
+    marker.openPopup();
+  }
+  document.querySelectorAll('.track-moto-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById(`mcard-${motoId}`)?.classList.add('selected');
+}
+
+function startTrackingUpdates() {
+  if (State.trackInterval) clearInterval(State.trackInterval);
+  State.trackInterval = setInterval(async () => {
+    if (State.page !== 'rastreamento') { clearInterval(State.trackInterval); return; }
+    const uid = State.user.userId;
+    const { data: motos } = await db.from('aju_motorcycles').select('*').eq('user_id', uid);
+    if (motos) {
+      for (const moto of motos) {
+        const { data: pos } = await db.from('aju_moto_positions')
+          .select('*').eq('motorcycle_id', moto.id)
+          .order('recorded_at', { ascending: false }).limit(1);
+        if (pos && pos.length > 0) {
+          updateMotoMarker(moto, pos[0]);
+          updateMotoStatusCard(moto.id, pos[0]);
+        }
+      }
+    }
+  }, 15000);
+}
+
+// ── CRUD Motos ──
+function openNewMoto() {
+  showModal(`
+    <h3>🏍️ Cadastrar Moto</h3>
+    <form onsubmit="saveMoto(event)">
+      <div class="form-row"><label>Nome *</label><input name="name" required placeholder="Ex: Honda CG 160"></div>
+      <div class="form-cols">
+        <div class="form-row"><label>Placa</label><input name="plate" placeholder="ABC-1234" maxlength="8"></div>
+        <div class="form-row"><label>IMEI do Rastreador</label><input name="imei" placeholder="123456789012345" maxlength="20"></div>
+      </div>
+      <div class="form-row"><label>Icone</label>
+        <div class="color-group" id="moto-icon-opts">
+          ${MOTO_ICONS.map((ic,i) => `<button type="button" class="icon-opt${i===0?' sel':''}" onclick="selMotoIcon(this)" data-val="${ic}" style="font-size:22px;padding:6px 10px;border:2px solid ${i===0?'var(--pink)':'var(--gray-200)'};border-radius:10px;background:var(--white);cursor:pointer">${ic}</button>`).join('')}
+        </div>
+      </div>
+      <div class="form-row"><label>Cor</label>
+        <div class="color-group" id="moto-color-opts">
+          ${MOTO_COLORS.map((c,i) => `<div class="color-opt${i===0?' sel':''}" style="background:${c}" onclick="selColor(this,'moto-color-opts')" data-val="${c}"></div>`).join('')}
+        </div>
+      </div>
+      <div style="background:var(--purple-l);border-radius:10px;padding:12px 14px;margin-bottom:14px">
+        <div style="font-size:12px;font-weight:600;color:var(--purple);margin-bottom:4px">📡 Integrar com Rastro System</div>
+        <div style="font-size:11px;color:#5b21b6;line-height:1.5">
+          Configure o IP/porta do Supabase no seu rastreador, ou use o IMEI acima para vincular.
+          O sistema recebe dados via API REST automaticamente.
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn-outline" onclick="App.closeModal()">Cancelar</button>
+        <button type="submit" class="btn-pink">Salvar</button>
+      </div>
+    </form>`);
+}
+
+function selMotoIcon(el) {
+  document.querySelectorAll('#moto-icon-opts .icon-opt').forEach(e => {
+    e.classList.remove('sel'); e.style.borderColor = 'var(--gray-200)';
+  });
+  el.classList.add('sel'); el.style.borderColor = 'var(--pink)';
+}
+
+async function saveMoto(e) {
+  e.preventDefault();
+  const f = e.target;
+  const icon = document.querySelector('#moto-icon-opts .sel')?.dataset.val || '🏍️';
+  const color = document.querySelector('#moto-color-opts .sel')?.dataset.val || '#ec4899';
+  await db.from('aju_motorcycles').insert({
+    user_id: State.user.userId,
+    name: f.name.value,
+    plate: f.plate.value.toUpperCase() || null,
+    tracker_imei: f.imei.value || null,
+    icon, color
+  });
+  toast('Moto cadastrada! 🏍️');
+  closeModal();
+  renderRastreamento();
+}
+
+async function openEditMoto(id) {
+  const { data: m } = await db.from('aju_motorcycles').select('*').eq('id', id).single();
+  if (!m) return;
+  showModal(`
+    <div class="modal-edit-header">
+      <h3>✏️ Editar Moto</h3>
+      <button class="btn-del-header" onclick="delMoto('${id}')">🗑</button>
+    </div>
+    <form onsubmit="updateMoto(event,'${id}')">
+      <div class="form-row"><label>Nome *</label><input name="name" required value="${m.name}"></div>
+      <div class="form-cols">
+        <div class="form-row"><label>Placa</label><input name="plate" value="${m.plate||''}" maxlength="8"></div>
+        <div class="form-row"><label>IMEI do Rastreador</label><input name="imei" value="${m.tracker_imei||''}" maxlength="20"></div>
+      </div>
+      <div class="form-row"><label>Icone</label>
+        <div class="color-group" id="moto-icon-opts">
+          ${MOTO_ICONS.map(ic => `<button type="button" class="icon-opt${ic===m.icon?' sel':''}" onclick="selMotoIcon(this)" data-val="${ic}" style="font-size:22px;padding:6px 10px;border:2px solid ${ic===m.icon?'var(--pink)':'var(--gray-200)'};border-radius:10px;background:var(--white);cursor:pointer">${ic}</button>`).join('')}
+        </div>
+      </div>
+      <div class="form-row"><label>Cor</label>
+        <div class="color-group" id="moto-color-opts">
+          ${MOTO_COLORS.map(c => `<div class="color-opt${c===m.color?' sel':''}" style="background:${c}" onclick="selColor(this,'moto-color-opts')" data-val="${c}"></div>`).join('')}
+        </div>
+      </div>
+      <div class="form-row">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" name="active" ${m.active?'checked':''} style="width:auto">
+          Rastreador ativo
+        </label>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn-outline" onclick="App.closeModal()">Cancelar</button>
+        <button type="submit" class="btn-pink">Salvar</button>
+      </div>
+    </form>`);
+}
+
+async function updateMoto(e, id) {
+  e.preventDefault();
+  const f = e.target;
+  const icon = document.querySelector('#moto-icon-opts .sel')?.dataset.val || '🏍️';
+  const color = document.querySelector('#moto-color-opts .sel')?.dataset.val || '#ec4899';
+  await db.from('aju_motorcycles').update({
+    name: f.name.value,
+    plate: f.plate.value.toUpperCase() || null,
+    tracker_imei: f.imei.value || null,
+    icon, color,
+    active: f.active.checked
+  }).eq('id', id);
+  toast('Moto atualizada! ✅');
+  closeModal();
+  renderRastreamento();
+}
+
+async function delMoto(id) {
+  if (!confirm('Remover esta moto e todo o historico de posicoes?')) return;
+  await db.from('aju_moto_positions').delete().eq('motorcycle_id', id);
+  await db.from('aju_motorcycles').delete().eq('id', id);
+  toast('Moto removida');
+  closeModal();
+  renderRastreamento();
+}
+
+// ── Simulacao para teste ──
+async function simularPosicao(motoId) {
+  const baseLat = -23.5505 + (Math.random() - 0.5) * 0.02;
+  const baseLng = -46.6333 + (Math.random() - 0.5) * 0.02;
+  await db.from('aju_moto_positions').insert({
+    motorcycle_id: motoId,
+    latitude: baseLat,
+    longitude: baseLng,
+    speed: Math.random() * 80,
+    heading: Math.random() * 360,
+    ignition: Math.random() > 0.3,
+    battery: 50 + Math.random() * 50
+  });
 }
 
 // ══════════════════════════════════════════════

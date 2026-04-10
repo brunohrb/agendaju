@@ -22,6 +22,11 @@
 
   <!-- Fontes -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Leaflet (mapa) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -96,6 +101,7 @@
         <a class="nav-item"        data-page="habitos"    onclick="App.go('habitos')">    <span>🌱</span> Hábitos      </a>
         <a class="nav-item"        data-page="financas"   onclick="App.go('financas')">   <span>💰</span> Finanças     </a>
         <a class="nav-item"        data-page="cofre"      onclick="App.go('cofre')">      <span>🔒</span> Cofre        </a>
+        <a class="nav-item"        data-page="rastreamento" onclick="App.go('rastreamento')"><span>🏍️</span> Rastreamento </a>
         <a class="nav-item"        data-page="config"     onclick="App.go('config')">     <span>⚙️</span> Configurações</a>
       </nav>
 
@@ -131,6 +137,7 @@
         <section id="pg-habitos"   class="page hidden"> <div class="page-inner" id="c-habitos"></div></section>
         <section id="pg-financas"  class="page hidden"> <div class="page-inner" id="c-financas"></div></section>
         <section id="pg-cofre"     class="page hidden"> <div class="page-inner" id="c-cofre"></div></section>
+        <section id="pg-rastreamento" class="page hidden"><div class="page-inner page-inner-map" id="c-rastreamento"></div></section>
         <section id="pg-config"    class="page hidden"> <div class="page-inner" id="c-config"></div></section>
       </main>
     </div>

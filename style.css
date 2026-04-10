@@ -556,6 +556,117 @@ body {
 .config-arrow { color: var(--gray-300); font-size: 16px; }
 
 /* ══════════════════════════════════════════
+   RASTREAMENTO DE MOTOS
+══════════════════════════════════════════ */
+.page-inner-map { padding: 0 !important; height: calc(100vh - var(--header-h)); display: flex; flex-direction: column; }
+
+.track-layout {
+  display: flex; flex: 1; height: 100%; overflow: hidden;
+}
+.track-sidebar {
+  width: 320px; min-width: 280px; background: var(--white);
+  border-right: 1px solid var(--gray-200);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.track-sidebar-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px; border-bottom: 1px solid var(--gray-100);
+}
+.track-sidebar-header h3 { font-size: 15px; font-weight: 700; }
+.track-moto-list {
+  flex: 1; overflow-y: auto; padding: 8px;
+}
+.track-moto-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px; border-radius: var(--radius-sm);
+  border: 1.5px solid var(--gray-100); background: var(--white);
+  margin-bottom: 6px; cursor: pointer; transition: all .18s;
+}
+.track-moto-card:hover { border-color: var(--pink-m); background: var(--pink-l); }
+.track-moto-card.selected { border-color: var(--pink); background: var(--pink-l); box-shadow: var(--shadow-sm); }
+.track-moto-icon {
+  width: 42px; height: 42px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0;
+}
+.track-moto-info { flex: 1; min-width: 0; }
+.track-moto-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track-moto-plate { font-size: 11px; color: var(--gray-400); font-weight: 500; letter-spacing: .04em; }
+.track-moto-status { font-size: 11px; color: var(--gray-500); display: flex; align-items: center; gap: 5px; margin-top: 2px; }
+.track-time { color: var(--gray-400); font-size: 10px; margin-left: 4px; }
+.track-moto-actions { flex-shrink: 0; }
+.icon-btn-sm {
+  background: none; border: none; cursor: pointer; font-size: 14px;
+  padding: 4px; border-radius: 6px; transition: background .18s;
+}
+.icon-btn-sm:hover { background: var(--gray-100); }
+
+/* Status dots */
+.status-dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; flex-shrink: 0;
+}
+.status-dot.online   { background: var(--green); box-shadow: 0 0 6px rgba(16,185,129,.5); }
+.status-dot.moving   { background: var(--yellow); box-shadow: 0 0 6px rgba(245,158,11,.5); animation: pulse-dot 1.2s infinite; }
+.status-dot.offline  { background: var(--gray-400); }
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .6; transform: scale(1.3); }
+}
+
+/* Map */
+.track-map-wrap { flex: 1; position: relative; min-width: 0; }
+.track-map { width: 100%; height: 100%; z-index: 1; }
+.track-map-legend {
+  position: absolute; bottom: 12px; left: 12px; z-index: 10;
+  background: rgba(255,255,255,.92); backdrop-filter: blur(6px);
+  border-radius: 10px; padding: 8px 14px;
+  display: flex; gap: 14px; font-size: 11px; font-weight: 500;
+  box-shadow: var(--shadow-sm); color: var(--gray-600);
+}
+.track-map-legend span { display: flex; align-items: center; gap: 5px; }
+
+/* Moto map marker */
+.moto-marker-wrap { background: none !important; border: none !important; }
+.moto-marker {
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; box-shadow: 0 3px 12px rgba(0,0,0,.2);
+  border: 3px solid #fff; transition: all .3s;
+}
+.moto-marker.online  { border-color: var(--green); }
+.moto-marker.moving  { border-color: var(--yellow); animation: pulse-marker 1.5s infinite; }
+.moto-marker.offline { border-color: var(--gray-400); opacity: .75; }
+@keyframes pulse-marker {
+  0%, 100% { box-shadow: 0 3px 12px rgba(0,0,0,.2); }
+  50% { box-shadow: 0 3px 20px rgba(245,158,11,.5); }
+}
+.moto-marker-icon { display: block; line-height: 1; }
+.moto-marker-label {
+  position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%);
+  white-space: nowrap; font-size: 10px; font-weight: 600;
+  background: rgba(255,255,255,.9); padding: 1px 6px;
+  border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,.12);
+  color: var(--gray-700);
+}
+
+/* Popup */
+.moto-popup-container .leaflet-popup-content-wrapper {
+  border-radius: 14px; padding: 0; box-shadow: var(--shadow-lg);
+}
+.moto-popup-container .leaflet-popup-content { margin: 0; width: 240px !important; }
+.moto-popup-container .leaflet-popup-tip { border-top-color: var(--white); }
+.moto-popup { font-family: 'Inter', sans-serif; }
+.moto-popup-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; border-bottom: 2px solid var(--pink);
+  font-size: 14px;
+}
+.moto-popup-body { padding: 10px 14px; }
+.moto-popup-row { font-size: 12px; color: var(--gray-600); padding: 3px 0; }
+.moto-popup-row strong { color: var(--gray-800); }
+
+/* ══════════════════════════════════════════
    RESPONSIVE — MOBILE
 ══════════════════════════════════════════ */
 @media (max-width: 768px) {
@@ -570,10 +681,22 @@ body {
   .grid-2 { grid-template-columns: 1fr 1fr; }
   .finance-summary { grid-template-columns: 1fr 1fr 1fr; }
   .form-cols { grid-template-columns: 1fr; }
+
+  /* Rastreamento mobile */
+  .track-layout { flex-direction: column; }
+  .track-sidebar {
+    width: 100%; min-width: 0; max-height: 200px;
+    border-right: none; border-bottom: 1px solid var(--gray-200);
+  }
+  .track-sidebar-header { padding: 10px 14px; }
+  .track-moto-list { display: flex; overflow-x: auto; overflow-y: hidden; gap: 6px; padding: 6px 10px; flex-wrap: nowrap; }
+  .track-moto-card { min-width: 200px; margin-bottom: 0; flex-shrink: 0; }
+  .track-map-wrap { flex: 1; min-height: 300px; }
 }
 @media (max-width: 480px) {
   .grid-2, .grid-3 { grid-template-columns: 1fr 1fr; }
   .finance-summary { grid-template-columns: 1fr; }
   .page-inner { padding: 14px 12px 40px; }
   .login-card { padding: 30px 22px; }
+  .track-moto-card { min-width: 180px; padding: 10px; }
 }
