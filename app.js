@@ -622,11 +622,13 @@ function openEditEvent(id) {
 async function updateEvent(e, id) {
   e.preventDefault();
   const f = e.target;
+  const existing = State.data.events.find(ev => ev.id === id) || {};
   const color = document.querySelector('#ev-colors .sel')?.dataset.color || EVENT_COLORS[0];
   const repeat = document.querySelector('#repeat-opts .sel')?.dataset.val || null;
-  const notify_event = f.notify_event.checked;
+  const notify_event = f.notify_event ? f.notify_event.checked : (existing.notify_event ?? true);
+  const description = f.description ? f.description.value : (existing.description || '');
   const { error } = await db.from('events').update({
-    title: f.title.value, description: f.description.value,
+    title: f.title.value, description,
     start_date: f.start_date.value, start_time: f.start_time.value||null,
     end_time: f.end_time.value||null, location: f.location.value,
     color, repeat: repeat||null, notify_event
